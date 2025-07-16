@@ -3,9 +3,12 @@ import shutil
 
 # Mapping extensions to folder names
 EXTENSION_MAP = {
-    'Images': ['.jpg', '.jpeg', '.png', '.gif'],
+    'Images': ['.jpg', '.heic', '.jpeg', '.png', '.gif'],
     'Documents': ['.pdf', '.docx', '.txt'],
     'Music': ['.mp3', '.wav'],
+    '3d Printing': ['.3mf', '.OBJ', '.stl', '.amf', '.gcode'],
+    'Disk Image Files': ['.dmg'],
+    'ISO Files': ['.iso', '.raw', '.xz'],
 }
 
 def organize_files(folder_path):
