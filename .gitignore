@@ -1,1 +1,3 @@
 file_rules.json
+# Ignore Virtual Environment
+.venv/

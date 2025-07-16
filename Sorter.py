@@ -1,3 +1,8 @@
+import threading
+import time
+from pathlib import Path
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 import os
 import json
 import shutil
@@ -73,17 +78,35 @@ def organize_files(source_folder, config, test_mode=False, recursive=False):
                     else:
                         shutil.move(file_path, dest_path)
 
+class DebouncedHandler(FileSystemEventHandler):
+    def __init__(self, callback, delay=5):
+        self.callback = callback
+        self.delay = delay
+        self._timer = None
+
+    def on_any_event(self, event):
+        if self._timer:
+            self._timer.cancel()
+        self._timer = threading.Timer(self.delay, self.callback)
+        self._timer.start()
+
 # GUI
 class FileSorterApp:
     def __init__(self, root):
+
         self.root = root
         self.root.title("Custom File Sorter")
 
         self.config = load_config()
         self.test_mode = tk.BooleanVar()
+        self.recursive = tk.BooleanVar()
+        self.watching = tk.BooleanVar()
+
+        self.observer = None
 
         self.build_gui()
         self.refresh_rule_list()
+
 
     def build_gui(self):
         frame = tk.Frame(self.root, padx=10, pady=10)
@@ -109,8 +132,11 @@ class FileSorterApp:
         self.recursive = tk.BooleanVar()
         tk.Checkbutton(frame, text="Include Subfolders", variable=self.recursive).grid(row=4, column=0, columnspan=3)
 
+        # Watcher Checkbox
+        tk.Checkbutton(frame, text="Enable Live File Watching", variable=self.watching, command=self.toggle_watcher).grid(row=5, column=0, columnspan=3)
+
         # Run Button
-        tk.Button(frame, text="Organize Folder", command=self.run_sorter).grid(row=5, column=0, columnspan=3, pady=10)
+        tk.Button(frame, text="Organize Folder", command=self.run_sorter).grid(row=6, column=0, columnspan=3, pady=10)
 
     def refresh_rule_list(self):
         self.rule_list.delete(0, tk.END)
@@ -146,6 +172,32 @@ class FileSorterApp:
             organize_files(folder, self.config, test_mode=self.test_mode.get(), recursive=self.recursive.get())
             if not self.test_mode.get():
                 messagebox.showinfo("Done", "Files have been organized.")
+
+    def toggle_watcher(self):
+        if self.watching.get():
+            folder = filedialog.askdirectory(title="Select Folder to Watch")
+            if folder:
+                handler = DebouncedHandler(lambda: organize_files(folder, self.config, recursive=self.recursive.get()))
+                self.observer = Observer()
+                self.observer.schedule(handler, folder, recursive=True)
+                self.observer.start()
+                print(f"Watching: {folder}")
+            else:
+                self.watching.set(False)  # Uncheck if user cancels
+        else:
+            if self.observer:
+                self.observer.stop()
+                self.observer.join()
+                self.observer = None
+                print("Stopped watching.")
+
+    def on_close(self):
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+        self.root.destroy()
+
+
 
 if __name__ == '__main__':
     root = tk.Tk()
